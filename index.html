@@ -42,7 +42,7 @@
   .shot {
     position: relative;
     display: block;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: var(--ratio, 16 / 9);
     background: var(--bg);
     overflow: hidden;
   }
@@ -123,9 +123,11 @@
     return u.href;
   };
 
-  const iframeCode = url =>
+  const ratioOf = item => (item.ratio || '16 / 9').trim();
+
+  const iframeCode = (item, url) =>
     '<iframe src="' + url + '" width="100%" height="100%" ' +
-    'style="border:0;display:block;aspect-ratio:16/9" ' +
+    'style="border:0;display:block;aspect-ratio:' + ratioOf(item).replace(/\s+/g, '') + '" ' +
     'loading="lazy"></iframe>';
 
   const cards = assets.map(item => {
@@ -133,7 +135,7 @@
     card.className = 'card';
     card.dataset.flip = '0';
     card.innerHTML =
-      '<a class="shot" target="_blank" rel="noopener" title="Открыть ' + item.file + '">' +
+      '<a class="shot" style="--ratio:' + ratioOf(item) + '" target="_blank" rel="noopener" title="Открыть ' + item.file + '">' +
         '<iframe src="' + urlFor(item, { preview: true }) + '" loading="lazy" title="' + item.title + '"></iframe>' +
       '</a>' +
       '<div class="info">' +
@@ -172,7 +174,7 @@
     const copyLink = card.querySelector('[data-act="link"]');
     const copyFrame = card.querySelector('[data-act="iframe"]');
     copyLink.dataset.copy = url;
-    copyFrame.dataset.copy = iframeCode(url);
+    copyFrame.dataset.copy = iframeCode(item, url);
 
     const flipBtn = card.querySelector('[data-act="flip"]');
     flipBtn.classList.toggle('on', flipped);

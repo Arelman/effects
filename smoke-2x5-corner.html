@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Green smoke 2:5 — угол</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111412; overflow: hidden; }
+  body { display: grid; place-items: center; }
+  .stage { width: min(100vw, calc(100vh * 0.4)); aspect-ratio: 2 / 5; background: #111412; }
+  .stage canvas { width: 100%; height: 100%; display: block; }
+  /* зеркало: ?flip=1 */
+  html.flip .stage { transform: scaleX(-1); }
+</style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).get('flip') === '1') document.documentElement.classList.add('flip');</script>
+<div class="stage"><canvas id="c" width="960" height="2400" aria-hidden="true"></canvas></div>
+
+<script id="fs" type="x-shader/x-fragment">
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+#define MODE 0
+const float LX = 0.27;          // длина вылета по X (ед.)
+const float LY = 1.0;          // длина вылета по Y (ед.)
+const float WARP = 0.22;       // сила варпа
+const vec2 MARGIN = vec2(0.12, 0.12);   // зона полного затухания у краёв кадра
+const float INSET = 0.2;          // отступ «угла» от краёв внутрь кадра
+const vec2 STRETCH = vec2(1.0, 0.55);  // вытянутость нитей дыма по потоку
+uniform vec2 R;
+uniform float P;
+const float TAU = 6.2831853;
+const float UNIT = 1200.0;        // 1 ед. = 1200 px — одинаковый масштаб текстуры во всех форматах
+const vec3 BG = vec3(0.0667, 0.0784, 0.0706); // #111412
+
+float h(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);   // плавная интерполяция — без изломов
+  return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p, float a){
+  float s = 0.0, k = 0.5;
+  for (int i = 0; i < 4; i++){
+    float m = 1.0 + mod(float(i), 2.0);
+    vec2 o = vec2(cos(a * m + float(i)), sin(a * m + float(i))) * 0.9;
+    s += k * vn(p + o);
+    p = p * 2.03 + vec2(17.1, 9.2);
+    k *= 0.5;
+  }
+  return s / 0.9375;
+}
+float sabs(float x){ return sqrt(x * x + 0.0004); }
+
+void main(){
+  vec2 p = gl_FragCoord.xy / UNIT;
+  vec2 WH = R / UNIT;
+  float a = P * TAU;
+
+  // мягкий двойной варп — шёлковые округлые формы
+  vec2 w1 = vec2(fbm(p * 1.4, a), fbm(p * 1.4 + vec2(5.2, 1.3), a + 1.0)) - 0.5;
+  vec2 w2 = vec2(fbm(p * 2.8 + w1, a + 2.0), fbm(p * 2.8 + vec2(1.7, 8.3) + w1, a + 3.0)) - 0.5;
+  vec2 q = p + w1 * WARP + w2 * (WARP * 0.27);
+
+  float env = 0.0, hotv = 0.0, s = 0.0;
+
+#if MODE == 0
+  // ── ЭНЕРГИЯ ИЗ ВЕРХНЕГО ПРАВОГО УГЛА: рукава вдоль осей X и Y с затуханием ──
+  vec2 d = (WH - vec2(INSET)) - q;
+  float dx = sabs(d.x) * (1.0 + 1.2 * (1.0 - smoothstep(-0.05, 0.05, d.x)));
+  float dy = sabs(d.y) * (1.0 + 1.2 * (1.0 - smoothstep(-0.05, 0.05, d.y)));
+  float T = 0.12;
+  float offY = 0.05 * sin(dx * 5.0 - a) * smoothstep(0.0, 0.4, dx);
+  float offX = 0.05 * sin(dy * 5.0 - a + 1.0) * smoothstep(0.0, 0.4, dy);
+  float Ty = T * (1.0 + 0.9 * exp(-dx / (0.25 * LX)));
+  float Tx = T * (1.0 + 0.9 * exp(-dy / (0.25 * LY)));
+  float armX = exp(-pow((dy - 0.08 - offY) / Ty, 2.0)) * exp(-pow(dx / LX, 1.6) * 2.6);
+  float armY = exp(-pow((dx - 0.08 - offX) / Tx, 2.0)) * exp(-pow(dy / LY, 1.6) * 2.6);
+  float ca = max(0.3 * LX, 0.16), cb = max(0.6 * LY, 0.16);
+  float core = exp(-(dx * dx / (ca * ca) + dy * dy / (cb * cb)));
+  float haze = 0.45 * exp(-(dx * dx / (0.36 * LX * LX) + dy * dy / (0.9 * LY * LY)));
+  env = core + 0.85 * armX + 0.85 * armY + haze;
+  float ha = max(0.14 * LX, 0.12), hb = max(0.28 * LY, 0.12);
+  float ex = dx - 0.7 * ha, ey = dy - 0.7 * hb;
+  hotv = exp(-(ex * ex / (ha * ha) + ey * ey / (hb * hb)));
+  s = length(vec2(dx / LX, dy / LY)) * 0.9;
+#else
+  // ── ГОРИЗОНТАЛЬНАЯ ВОЛНА-ЛИНИЯ: слева направо, нарастает к правому всплеску ──
+  float u = q.x / WH.x;
+  float cy = 0.5 * WH.y + (0.045 * sin(u * TAU - a) + 0.012 * sin(u * TAU * 2.0 + a * 2.0)) * smoothstep(0.0, 0.35, u);
+  float dd = q.y - cy;
+  float wd = 0.025 + 0.028 * smoothstep(0.25, 0.85, u);
+  float ribbon = exp(-dd * dd / (wd * wd));
+  float thin = exp(-dd * dd / (0.012 * 0.012));
+  float ex = q.x - 0.76 * WH.x;
+  float cloud = exp(-(ex * ex / (0.30 * 0.30) + dd * dd / (0.07 * 0.07)));
+  float fade = smoothstep(0.0, 0.08, u) * (1.0 - smoothstep(0.9, 1.0, u));
+  env = (0.9 * ribbon + cloud) * fade;
+  hotv = (0.45 * thin * smoothstep(0.2, 0.8, u) + exp(-(ex * ex / (0.16 * 0.16) + dd * dd / (0.035 * 0.035)))) * fade;
+  s = u;
+#endif
+
+  // страховка: всё затухает в ноль до кромки кадра — ничего не обрезается
+  vec2 ed = min(p, WH - p);
+  float mk = smoothstep(0.0, MARGIN.x, ed.x) * smoothstep(0.0, MARGIN.y, ed.y);
+  env *= mk; hotv *= mk;
+
+  // бегущий импульс энергии
+  float ph = fract(2.0 * P - s);
+  float pl = exp(-ph * 4.0) * smoothstep(0.0, 0.07, ph) * (1.0 - smoothstep(0.8, 1.0, ph));
+
+  float body = clamp(1.0 - exp(-env * 1.5), 0.0, 1.3);
+  vec2 nq = q * STRETCH;
+  float n = fbm(nq * 3.2 + vec2(0.0, 3.0), a);
+  float t = 2.0 * n - 1.0;
+  float ridge = clamp((1.0 - sqrt(t * t + 0.02)) / 0.859, 0.0, 1.0);
+  ridge *= ridge;
+  float n2 = fbm(nq * 6.5, a);
+  float fil = ridge * 0.8 + 0.35 * n2;
+  float den = body * (0.25 + 1.15 * fil);
+  den *= 1.0 + 0.7 * pl * body;
+
+  float hot = clamp(hotv * 1.1 + 0.35 * pl * body * body, 0.0, 1.0);
+  hot = pow(hot, 1.4) * (0.45 + 0.9 * ridge) * (0.9 + 0.2 * sin(a * 2.0));
+
+  vec3 col = vec3(0.03, 0.34, 0.05) * den
+           + vec3(0.50, 1.00, 0.10) * pow(den, 2.2) * 1.2
+           + vec3(1.00) * hot * hot * 1.7;
+  col = 1.0 - exp(-col * 1.35);
+
+  // искры и пыль — как в green-smoke
+  float sp = 0.0;
+  for (int L = 0; L < 2; L++){
+    float sc = L == 0 ? 38.0 : 70.0;
+    vec2 g = p * sc;
+    vec2 c = floor(g), f = fract(g);
+    float r = h(c + float(L) * 7.0);
+    vec2 pos = 0.5 + 0.3 * vec2(sin(a + r * TAU), cos(a * 2.0 + r * 17.0));
+    float dist = length(f - pos);
+    float tw = 0.5 + 0.5 * sin(a * 2.0 + r * TAU);
+    sp += step(0.86, r) * smoothstep(0.16, 0.0, dist) * tw * smoothstep(0.05, 0.6, env);
+  }
+  col += vec3(0.55, 1.0, 0.2) * sp * 0.9;
+
+  col += BG;
+  col -= h(gl_FragCoord.xy) / 255.0;
+  gl_FragColor = vec4(max(col, 0.0), 1.0);
+}
+</script>
+
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  const gl = cv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+  if (!gl) return;
+  const T = 16; // бесшовный цикл, сек
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'));
+  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(pr)); return; }
+  gl.useProgram(pr);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'a');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.uniform2f(gl.getUniformLocation(pr, 'R'), cv.width, cv.height);
+  const uP = gl.getUniformLocation(pr, 'P');
+  const draw = p => { gl.uniform1f(uP, p); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { draw(0.15); return; }
+  let running = true;
+  const t0 = performance.now();
+  const frame = now => { if (!running) return; draw((((now - t0) / 1000) % T) / T); requestAnimationFrame(frame); };
+  new IntersectionObserver(([e]) => { const was = running; running = e.isIntersecting; if (running && !was) requestAnimationFrame(frame); }).observe(cv);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
