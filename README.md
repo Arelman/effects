@@ -8,13 +8,20 @@
 
 ```
 .
-├── index.html          каталог: превью, ссылки, кнопки копирования
-├── assets.js           список элементов (одна строка на элемент)
-├── green-wave.html     волна из нитей · Canvas 2D · цикл 14 с
-├── green-smoke.html    объёмный дым с искрами · WebGL · цикл 16 с
-├── green-plume.html    клубящийся дым · WebGL · alpha · цикл 12 с
-├── green-ribbon.html   лента дыма · WebGL · alpha · цикл 12 с
-└── .nojekyll           отключает обработку Jekyll на GitHub Pages
+├── index.html              каталог: превью, ссылки, кнопки копирования
+├── assets.js               список элементов (одна строка на элемент)
+├── green-wave.html         волна из нитей · Canvas 2D · цикл 14 с
+├── green-smoke.html        объёмный дым с искрами · WebGL · цикл 16 с
+├── green-plume.html        клубящийся дым · WebGL · alpha · цикл 12 с
+├── green-ribbon.html       лента дыма · WebGL · alpha · цикл 12 с
+├── smoke-1-corner.html     дым A · угол        ┐
+├── smoke-2-ribbon.html     дым B · лента       │ первое поколение
+├── smoke-3-plume.html      дым C · шлейф       ┘
+├── smoke-v2-1-corner.html  дым v2 A · угол     ┐
+├── smoke-v2-2-ribbon.html  дым v2 B · лента    │ плотнее ядро, круглее клубы
+├── smoke-v2-3-plume.html   дым v2 C · шлейф    ┘
+├── .gitignore              папка с исходниками не публикуется
+└── .nojekyll               отключает обработку Jekyll на GitHub Pages
 ```
 
 Ссылка на элемент — это просто имя файла:
@@ -55,6 +62,7 @@ https://arelman.github.io/effects/green-plume.html
 ## Особенности
 
 - `green-plume.html` и `green-ribbon.html` имеют прозрачный фон — их можно класть поверх макета, фона другого блока или градиента.
+- `smoke-*.html` наоборот непрозрачные: держат фиксированный кадр 16:9 с фоном `#111412`, поэтому в блоке другой пропорции по краям будет заливка, а не обрезка.
 - Для проверки прозрачности у этих файлов есть параметр `?bg=dark`, `?bg=white` или `?bg=checker`.
 - Анимация останавливается, когда блок вне экрана, и не грузит процессор.
 - При `prefers-reduced-motion: reduce` показывается статичный кадр.

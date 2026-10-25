@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Green smoke C</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111412; overflow: hidden; }
+  body { display: grid; place-items: center; }
+  /* Фиксированный кадр 16:9 (1920×1080), целиком вписан в окно — ничего не обрезается */
+  .stage { width: min(100vw, calc(100vh * 16 / 9)); aspect-ratio: 16 / 9; background: #111412; }
+  .stage canvas { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<div class="stage"><canvas id="c" width="1920" height="1080" aria-hidden="true"></canvas></div>
+
+<script id="fs" type="x-shader/x-fragment">
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 R;
+uniform float P;
+const float TAU = 6.2831853;
+const vec3 BG = vec3(0.0667, 0.0784, 0.0706); // #111412
+
+float h(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p, float a){
+  float s = 0.0, k = 0.5;
+  for (int i = 0; i < 5; i++){
+    float m = 1.0 + mod(float(i), 2.0);
+    vec2 o = vec2(cos(a * m + float(i)), sin(a * m + float(i))) * 0.9;
+    s += k * vn(p + o);
+    p = p * 2.03 + vec2(17.1, 9.2);
+    k *= 0.5;
+  }
+  return s / 0.97;
+}
+float seg(vec2 p, vec2 a, vec2 b, float w1, float w2){
+  vec2 ab = b - a; float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+  float d = length(p - a - ab * t), w = mix(w1, w2, t);
+  return exp(-d * d / (w * w) * 0.9);
+}
+float blob(vec2 p, vec2 c, float rx, float ry){
+  vec2 e = p - c; return exp(-(e.x * e.x / (rx * rx) + e.y * e.y / (ry * ry)));
+}
+
+void main(){
+  vec2 uv = gl_FragCoord.xy / R;
+  float asp = R.x / R.y;
+  float a = P * TAU;
+  vec2 p0 = vec2(uv.x * asp, uv.y);
+
+  vec2 w = vec2(fbm(p0 * 2.2, a), fbm(p0 * 2.2 + vec2(5.2, 1.3), a + 1.0)) - 0.5;
+  vec2 q = p0 + w * 0.10;
+  vec2 p = q - vec2(asp * 0.5, 0.5);
+
+  float b = 0.0, hb = 0.0;
+  b = max(b, seg(p, vec2(-0.4783,0.3520), vec2(-0.4423,0.3101), 0.0108, 0.0150));
+  b = max(b, seg(p, vec2(-0.4423,0.3101), vec2(-0.3765,0.2083), 0.0150, 0.0209));
+  b = max(b, seg(p, vec2(-0.3765,0.2083), vec2(-0.2867,0.2203), 0.0209, 0.0239));
+  b = max(b, seg(p, vec2(-0.2867,0.2203), vec2(-0.1670,0.2502), 0.0239, 0.0269));
+  b = max(b, seg(p, vec2(-0.1670,0.2502), vec2(-0.0952,0.2622), 0.0269, 0.0299));
+  b = max(b, seg(p, vec2(-0.0952,0.2622), vec2(-0.0174,0.1784), 0.0299, 0.0419));
+  b = max(b, seg(p, vec2(-0.0174,0.1784), vec2(0.0724,0.1484), 0.0419, 0.0539));
+  b = max(b, seg(p, vec2(0.0724,0.1484), vec2(0.2221,0.1484), 0.0539, 0.0718));
+  b = max(b, blob(p, vec2(0.2819,0.1604), 0.1556, 0.1377) * 1.0);
+  b = max(b, blob(p, vec2(0.3597,0.2981), 0.1137, 0.1018) * 0.8);
+  b = max(b, blob(p, vec2(0.3837,-0.0790), 0.1197, 0.1676) * 0.8);
+  b = max(b, blob(p, vec2(0.3119,-0.2287), 0.0898, 0.1437) * 0.7);
+  b = max(b, blob(p, vec2(0.1024,0.0407), 0.0898, 0.0658) * 0.6);
+  b = max(b, blob(p, vec2(0.4316,0.1006), 0.0898, 0.1496) * 0.7);
+  hb = max(hb, blob(p, vec2(0.2819,0.1484), 0.1377, 0.1077) * 1.0);
+  hb = max(hb, blob(p, vec2(0.3418,-0.0491), 0.0898, 0.1197) * 0.5);
+  float ribbon = b;
+  hb = max(hb, 0.35 * ribbon * ribbon);
+  float body = clamp(b * 1.15, 0.0, 1.5);
+
+  float n = fbm(q * 5.5 + vec2(0.0, 3.0), a);
+  float ridge = pow(1.0 - abs(2.0 * n - 1.0), 3.0);
+  float n2 = fbm(q * 11.0, a);
+  float fil = ridge * 0.9 + 0.25 * n2;
+  float den = body * (0.22 + 1.15 * fil);
+
+  float hot = clamp(hb * 1.1, 0.0, 1.0);
+  hot = pow(hot, 1.5) * (0.4 + 0.9 * ridge);
+
+  vec3 col = vec3(0.03, 0.34, 0.05) * den
+           + vec3(0.50, 1.00, 0.10) * pow(den, 2.2) * 1.2
+           + vec3(1.00) * hot * hot * 1.7;
+  col = 1.0 - exp(-col * 1.35);
+
+  float sp = 0.0;
+  for (int L = 0; L < 2; L++){
+    float s = L == 0 ? 38.0 : 70.0;
+    vec2 g = p0 * s;
+    vec2 c = floor(g), f = fract(g);
+    float r = h(c + float(L) * 7.0);
+    vec2 pos = 0.5 + 0.3 * vec2(sin(a + r * TAU), cos(a * 2.0 + r * 17.0));
+    float dist = length(f - pos);
+    float tw = 0.5 + 0.5 * sin(a * 2.0 + r * TAU);
+    float near = smoothstep(0.05, 0.6, b);
+    sp += step(0.86, r) * smoothstep(0.16, 0.0, dist) * tw * near;
+  }
+  col += vec3(0.55, 1.0, 0.2) * sp * 0.9;
+
+  col += BG;
+  col -= h(gl_FragCoord.xy) / 255.0;
+  gl_FragColor = vec4(max(col, 0.0), 1.0);
+}
+</script>
+
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  const gl = cv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+  if (!gl) return;
+  const T = 16; // длительность бесшовного цикла, сек
+
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}'));
+  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, document.getElementById('fs').textContent));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(pr)); return; }
+  gl.useProgram(pr);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'a');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.uniform2f(gl.getUniformLocation(pr, 'R'), cv.width, cv.height);
+  const uP = gl.getUniformLocation(pr, 'P');
+  const draw = p => { gl.uniform1f(uP, p); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { draw(0.15); return; }
+
+  let running = true;
+  const t0 = performance.now();
+  const frame = now => {
+    if (!running) return;
+    draw((((now - t0) / 1000) % T) / T);
+    requestAnimationFrame(frame);
+  };
+  new IntersectionObserver(([e]) => {
+    const was = running; running = e.isIntersecting;
+    if (running && !was) requestAnimationFrame(frame);
+  }).observe(cv);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
