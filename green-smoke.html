@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Green smoke</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #030705; }
-  .smoke { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 100vh; margin: 0 auto; background: #030705; overflow: hidden; }
+  html, body { margin: 0; height: 100%; background: #111412; }
+  .smoke { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 100vh; margin: 0 auto; background: #111412; overflow: hidden; }
   .smoke canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* зеркало: ?flip=1 */
+  html.flip .smoke { transform: scaleX(-1); }
 </style>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).get('flip') === '1') document.documentElement.classList.add('flip');</script>
 <div class="smoke"><canvas id="smoke-canvas" aria-hidden="true"></canvas></div>
 
 <script id="fs" type="x-shader/x-fragment">
@@ -93,7 +96,7 @@ void main(){
   }
   col += vec3(0.55, 1.0, 0.2) * sp * 0.9;
 
-  col += vec3(0.008, 0.02, 0.012);
+  col += vec3(0.0667, 0.0784, 0.0706);   // фон #111412
   col -= h(gl_FragCoord.xy) / 255.0;  // против бэндинга
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }

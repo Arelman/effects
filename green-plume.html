@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Green plume</title>
 <style>
-  html, body { margin: 0; height: 100%; background: transparent; }
+  html, body { margin: 0; height: 100%; background: #111412; }
   .plume { position: absolute; inset: 0; }
   .plume canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* зеркало: ?flip=1 */
+  html.flip .plume { transform: scaleX(-1); }
 </style>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).get('flip') === '1') document.documentElement.classList.add('flip');</script>
 <div class="plume"><canvas id="plume-canvas" aria-hidden="true"></canvas></div>
 
 <script id="fs" type="x-shader/x-fragment">
@@ -115,11 +118,13 @@ void main(){
   const MAX_DPR = 1.5;   // потолок разрешения рендера
   const PAD = 0.03;      // поля вокруг картинки: ничего не упирается в край кадра
 
-  // фон для предпросмотра: ?bg=dark | white | checker  (на сайте не нужен)
+  // фон: #111412 по умолчанию; ?bg=none — прозрачный, ?bg=white, ?bg=checker, ?bg=RRGGBB
   const bg = new URLSearchParams(location.search).get('bg');
-  if (bg === 'dark') document.body.style.background = '#060b08';
+  if (bg === 'dark') document.body.style.background = '#111412';
+  if (bg === 'none') document.body.style.background = 'transparent';
   if (bg === 'white') document.body.style.background = '#fff';
   if (bg === 'checker') document.body.style.background = 'repeating-conic-gradient(#2a2a2a 0 25%,#3a3a3a 0 50%) 0 0/24px 24px';
+  if (/^[0-9a-f]{6}$/i.test(bg || '')) document.body.style.background = '#' + bg;
 
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
   const pr = gl.createProgram();

@@ -6,11 +6,11 @@
 <title>Ресурсы</title>
 <style>
   :root {
-    --bg: #080b0a;
-    --card: #0e1411;
-    --line: #1e2a24;
+    --bg: #111412;
+    --card: #171b18;
+    --line: #262b27;
     --text: #dbe5df;
-    --dim: #78877f;
+    --dim: #7d8a82;
     --accent: #8ce63c;
   }
   * { box-sizing: border-box; }
@@ -37,13 +37,13 @@
     display: flex;
     flex-direction: column;
   }
-  .card:hover { border-color: #2e3d35; }
+  .card:hover { border-color: #334036; }
 
   .shot {
     position: relative;
     display: block;
     aspect-ratio: 16 / 9;
-    background: #050806;
+    background: var(--bg);
     overflow: hidden;
   }
   .shot iframe {
@@ -54,6 +54,7 @@
     border: 0;
     display: block;
     pointer-events: none;
+    transition: transform .2s ease;
   }
 
   .info { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
@@ -79,11 +80,12 @@
   }
   button:hover { background: #1a241d; border-color: #33453a; }
   button.done { color: var(--accent); border-color: #3a5a2c; background: #16200f; }
+  button.on { color: var(--accent); border-color: #3a5a2c; background: #16200f; }
 
-  footer { margin-top: 40px; color: var(--dim); font-size: 12px; line-height: 1.7; }
+  footer { margin-top: 40px; color: var(--dim); font-size: 12px; line-height: 1.8; }
   footer code {
     font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: #93a79b; background: #0e1411; border: 1px solid var(--line);
+    color: #93a79b; background: #171b18; border: 1px solid var(--line);
     border-radius: 4px; padding: 1px 5px;
   }
 </style>
@@ -100,7 +102,8 @@
   <div class="grid" id="grid"></div>
 
   <footer>
-    Добавить новый ресурс: положить файл в корень и дописать строку в <code>assets.js</code>.
+    Добавить ресурс: положить файл в корень и дописать строку в <code>assets.js</code>.<br>
+    <code>?flip=1</code> — зеркальная версия, <code>?bg=none</code> — прозрачный фон, <code>?bg=RRGGBB</code> — свой цвет.
   </footer>
 
 </div>
@@ -110,60 +113,105 @@
 (() => {
   const grid = document.getElementById('grid');
   const assets = window.ASSETS || [];
-  const abs = file => new URL(file, location.href).href;
 
   document.getElementById('count').textContent = assets.length + ' шт.';
+
+  // адрес файла с учётом параметров
+  const urlFor = (item, opts = {}) => {
+    const u = new URL(opts.preview && item.preview ? item.preview : item.file, location.href);
+    if (opts.flip) u.searchParams.set('flip', '1');
+    return u.href;
+  };
 
   const iframeCode = url =>
     '<iframe src="' + url + '" width="100%" height="100%" ' +
     'style="border:0;display:block;aspect-ratio:16/9" ' +
     'loading="lazy"></iframe>';
 
-  assets.forEach(item => {
-    const url = abs(item.file);
-    const previewUrl = abs(item.preview || item.file);
-
+  const cards = assets.map(item => {
     const card = document.createElement('article');
     card.className = 'card';
+    card.dataset.flip = '0';
     card.innerHTML =
-      '<a class="shot" href="' + url + '" target="_blank" rel="noopener" title="Открыть ' + item.file + '">' +
-        '<iframe src="' + previewUrl + '" loading="lazy" title="' + item.title + '"></iframe>' +
+      '<a class="shot" target="_blank" rel="noopener" title="Открыть ' + item.file + '">' +
+        '<iframe src="' + urlFor(item, { preview: true }) + '" loading="lazy" title="' + item.title + '"></iframe>' +
       '</a>' +
       '<div class="info">' +
         '<h2 class="name">' + item.title + (item.transparent ? '<span class="badge">alpha</span>' : '') + '</h2>' +
         '<p class="note">' + item.note + '</p>' +
-        '<div class="path"><a href="' + url + '" target="_blank" rel="noopener">' + item.file + '</a></div>' +
+        '<div class="path"><a target="_blank" rel="noopener">' + item.file + '</a></div>' +
         '<div class="actions">' +
-          '<button data-copy="' + url + '">Ссылка</button>' +
-          '<button data-copy="' + iframeCode(url).replace(/"/g, '&quot;') + '">iframe</button>' +
+          '<button data-act="link">Ссылка</button>' +
+          '<button data-act="iframe">iframe</button>' +
+          '<button data-act="flip">Отразить</button>' +
         '</div>' +
       '</div>';
-
+    card._item = item;
     grid.appendChild(card);
+    return card;
   });
 
-  // кнопки копирования
-  grid.addEventListener('click', async e => {
-    const btn = e.target.closest('button[data-copy]');
-    if (!btn) return;
-    const text = btn.dataset.copy;
-    const label = btn.textContent;
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    btn.textContent = 'Скопировано';
-    btn.classList.add('done');
-    setTimeout(() => {
-      btn.textContent = label;
-      btn.classList.remove('done');
-    }, 1400);
+  // состояние зеркала
+  const isFlipped = card => card.dataset.flip === '1';
+
+  const syncCard = card => {
+    const item = card._item;
+    const flipped = isFlipped(card);
+    const url = urlFor(item, { flip: flipped });
+
+    const frame = card.querySelector('iframe');
+    frame.style.transform = flipped ? 'scaleX(-1)' : '';
+
+    const shot = card.querySelector('.shot');
+    shot.href = url;
+
+    const path = card.querySelector('.path a');
+    path.href = url;
+    path.textContent = item.file + (flipped ? '?flip=1' : '');
+
+    const copyLink = card.querySelector('[data-act="link"]');
+    const copyFrame = card.querySelector('[data-act="iframe"]');
+    copyLink.dataset.copy = url;
+    copyFrame.dataset.copy = iframeCode(url);
+
+    const flipBtn = card.querySelector('[data-act="flip"]');
+    flipBtn.classList.toggle('on', flipped);
+    flipBtn.textContent = flipped ? 'Зеркало' : 'Отразить';
+  };
+
+  cards.forEach(card => {
+    syncCard(card);
+
+    // копирование
+    card.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+
+      if (btn.dataset.act === 'flip') {
+        card.dataset.flip = isFlipped(card) ? '0' : '1';
+        syncCard(card);
+        return;
+      }
+
+      const text = btn.dataset.copy;
+      const label = btn.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      btn.textContent = 'Скопировано';
+      btn.classList.add('done');
+      setTimeout(() => {
+        btn.textContent = label;
+        btn.classList.remove('done');
+      }, 1400);
+    });
   });
 })();
 </script>

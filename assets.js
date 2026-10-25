@@ -16,16 +16,16 @@ window.ASSETS = [
   {
     file: 'green-plume.html',
     title: 'Green plume',
-    note: 'Клубящийся дым из картинки. Прозрачный фон — ложится поверх любого макета. WebGL, цикл 12 с.',
+    note: 'Клубящийся дым из картинки, фон #111412. С ?bg=none становится прозрачным и ложится поверх любого макета. WebGL, цикл 12 с.',
     transparent: true,
-    preview: 'green-plume.html?bg=dark'
+    preview: 'green-plume.html'
   },
   {
     file: 'green-ribbon.html',
     title: 'Green ribbon',
-    note: 'S-образная лента дыма из картинки. Прозрачный фон. WebGL, цикл 12 с.',
+    note: 'S-образная лента дыма из картинки, фон #111412. С ?bg=none становится прозрачной. WebGL, цикл 12 с.',
     transparent: true,
-    preview: 'green-ribbon.html?bg=dark'
+    preview: 'green-ribbon.html'
   },
   {
     file: 'smoke-1-corner.html',
