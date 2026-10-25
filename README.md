@@ -10,16 +10,16 @@
 
 ## Ссылки
 
-После публикации:
+- `https://arelman.github.io/green-wave/` — титульная страница
+- `https://arelman.github.io/green-wave/green-wave.html`
+- `https://arelman.github.io/green-wave/green-smoke.html`
 
-- `https://USERNAME.github.io/REPO/` — титульная страница
-- `https://USERNAME.github.io/REPO/green-wave.html`
-- `https://USERNAME.github.io/REPO/green-smoke.html`
+Сайт: <https://arelman.github.io/green-wave/> · Репозиторий: <https://github.com/Arelman/green-wave>
 
 ## Встраивание
 
 ```html
-<iframe src="https://USERNAME.github.io/REPO/green-wave.html"
+<iframe src="https://arelman.github.io/green-wave/green-wave.html"
         width="100%" height="100%"
         style="border:0;display:block;aspect-ratio:16/9"
         loading="lazy" title="Green wave"></iframe>
