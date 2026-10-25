@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Green wave</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #050a08; }
+  /* Контейнер 16:9. Для вставки в сайт достаточно блока .wave + скрипта ниже */
+  .wave {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 100vh;
+    margin: 0 auto;
+    background: #050a08;
+    overflow: hidden;
+  }
+  .wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<div class="wave"><canvas id="wave-canvas" aria-hidden="true"></canvas></div>
+
+<script>
+(() => {
+  const cv = document.getElementById('wave-canvas');
+  const ctx = cv.getContext('2d');
+
+  // ——— Настройки ———
+  const T = 14;        // длительность бесшовного цикла, сек
+  const N = 64;        // количество прядей
+  const M = 260;       // точек на прядь
+  const TAU = Math.PI * 2;
+  const g = (u, m, s) => Math.exp(-((u - m) * (u - m)) / (2 * s * s));
+
+  let W, H, dpr;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = cv.getBoundingClientRect();
+    W = cv.width = Math.round(r.width * dpr);
+    H = cv.height = Math.round(r.height * dpr);
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  // p — фаза цикла 0..1; все временные частоты целые, поэтому цикл замыкается без шва
+  const centre = (u, p) => 0.53
+    + 0.030 * Math.sin(TAU * (1.7 * u - p) + 0.6)
+    + 0.018 * Math.sin(TAU * (3.9 * u + 2 * p) + 2.1)
+    + 0.008 * Math.sin(TAU * (8.3 * u - 3 * p) + 4.0);
+
+  const peakX = p => 0.64 + 0.025 * Math.sin(TAU * p);
+
+  const spike = (u, p) =>
+    -0.115 * (0.85 + 0.15 * Math.sin(TAU * 2 * p)) * g(u, peakX(p), 0.055)
+    + 0.06 * g(u, 0.44 + 0.02 * Math.sin(TAU * p + 1), 0.045);
+
+  const thick = (u, p) => 0.035 + 0.05 * g(u, 0.5, 0.3)
+    + 0.012 * (1 + Math.sin(TAU * (2.3 * u - p) + 1));
+
+  const base = new Float32Array(M), thk = new Float32Array(M), amp = new Float32Array(M);
+
+  function draw(p) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+
+    const px = peakX(p);
+
+    // свечение у гребня
+    const cy = (centre(px, p) + spike(px, p)) * H;
+    ctx.save();
+    ctx.translate(px * W, cy);
+    ctx.scale(1, 0.4);
+    const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, W * 0.2);
+    rg.addColorStop(0, 'rgba(190,255,100,.38)');
+    rg.addColorStop(0.4, 'rgba(110,220,50,.12)');
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(-W * 0.2, -W * 0.2, W * 0.4, W * 0.4);
+    ctx.restore();
+
+    // цвет вдоль ленты: тёмно-зелёный по краям, почти белый на гребне
+    const gr = ctx.createLinearGradient(0, 0, W, 0);
+    gr.addColorStop(0, 'rgb(60,150,40)');
+    gr.addColorStop(0.3, 'rgb(90,190,50)');
+    gr.addColorStop(px - 0.12, 'rgb(130,230,60)');
+    gr.addColorStop(px, 'rgb(235,255,190)');
+    gr.addColorStop(px + 0.12, 'rgb(130,230,60)');
+    gr.addColorStop(0.85, 'rgb(70,170,45)');
+    gr.addColorStop(1, 'rgb(50,130,40)');
+    ctx.strokeStyle = gr;
+    ctx.lineJoin = 'round';
+
+    for (let i = 0; i < M; i++) {
+      const u = i / (M - 1);
+      base[i] = centre(u, p) + spike(u, p);
+      thk[i] = thick(u, p) * (1 - 0.65 * g(u, px, 0.05));
+      amp[i] = 0.4 + g(u, 0.5, 0.3);
+    }
+
+    const passes = [
+      { lw: 3.2, a: 0.035 },  // мягкое свечение
+      { lw: 1.0, a: 0.24 }    // тонкие нити
+    ];
+    for (const pass of passes) {
+      ctx.lineWidth = pass.lw * dpr;
+      for (let k = 0; k < N; k++) {
+        const v = (k / (N - 1)) * 2 - 1;
+        ctx.globalAlpha = pass.a * (1 - 0.5 * Math.abs(v));
+        ctx.beginPath();
+        for (let i = 0; i < M; i++) {
+          const u = i / (M - 1);
+          const y = (base[i] + v * thk[i]
+            + 0.010 * amp[i] * Math.sin(TAU * (5 + (k % 3) * 0.8) * u + TAU * (v * 0.25 - 2 * p) + k * 0.7)) * H;
+          const x = (u * 1.04 - 0.02) * W;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // яркая центральная жила
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 2.2 * dpr;
+    ctx.beginPath();
+    for (let i = 0; i < M; i++) {
+      const u = i / (M - 1);
+      const x = (u * 1.04 - 0.02) * W, y = base[i] * H;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // ——— Запуск ———
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let running = true, t0 = performance.now();
+
+  function frame(now) {
+    if (!running) return;
+    draw((((now - t0) / 1000) % T) / T);
+    requestAnimationFrame(frame);
+  }
+
+  if (still) {
+    draw(0.1);
+    addEventListener('resize', () => draw(0.1));
+  } else {
+    // не жжём процессор, когда блок вне экрана
+    new IntersectionObserver(([e]) => {
+      const was = running;
+      running = e.isIntersecting;
+      if (running && !was) requestAnimationFrame(frame);
+    }).observe(cv);
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
