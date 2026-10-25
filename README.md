@@ -2,7 +2,7 @@
 
 Небольшая библиотека визуальных элементов: каждый — один самодостаточный HTML-файл без зависимостей и внешних запросов. Открывается по прямой ссылке и вставляется в любой конструктор через `iframe`.
 
-**Каталог:** https://arelman.github.io/green-wave/
+**Каталог:** https://arelman.github.io/effects/
 
 ## Структура
 
@@ -20,8 +20,8 @@
 Ссылка на элемент — это просто имя файла:
 
 ```
-https://arelman.github.io/green-wave/green-wave.html
-https://arelman.github.io/green-wave/green-plume.html
+https://arelman.github.io/effects/green-wave.html
+https://arelman.github.io/effects/green-plume.html
 ```
 
 ## Добавить новый элемент
@@ -44,7 +44,7 @@ https://arelman.github.io/green-wave/green-plume.html
 ## Встраивание
 
 ```html
-<iframe src="https://arelman.github.io/green-wave/green-wave.html"
+<iframe src="https://arelman.github.io/effects/green-wave.html"
         width="100%" height="100%"
         style="border:0;display:block;aspect-ratio:16/9"
         loading="lazy"></iframe>
